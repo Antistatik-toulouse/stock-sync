@@ -52,15 +52,21 @@ async function shopify(path, method = 'GET', body = null) {
 
 // --- Main ---
 async function main() {
+  if (!SHOPIFY_TOKEN) throw new Error('Secret SHOPIFY_TOKEN manquant dans GitHub Actions');
+  if (!TOPTEX_PASSWORD) throw new Error('Secret TOPTEX_PASSWORD manquant dans GitHub Actions');
+  if (!TOPTEX_API_KEY) throw new Error('Secret TOPTEX_API_KEY manquant dans GitHub Actions');
+
   console.log(`\n🔄 Sync stock démarrée — ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`);
 
   // 1. Location Shopify
-  const { locations } = await shopify('/locations.json');
-  const locationId = locations[0].id;
-  console.log(`📍 Location Shopify: ${locations[0].name} (${locationId})`);
+  const locRes = await shopify('/locations.json');
+  if (!locRes.locations?.length) throw new Error(`Shopify locations invalide: ${JSON.stringify(locRes)}`);
+  const locationId = locRes.locations[0].id;
+  console.log(`📍 Location Shopify: ${locRes.locations[0].name} (${locationId})`);
 
   // 2. Produits Shopify
   const { products } = await shopify('/products.json?limit=250&fields=id,title,variants');
+  if (!products) throw new Error('Shopify products invalide');
   console.log(`📦 ${products.length} produits Shopify chargés`);
 
   // 3. Inventaire Toptex par ref
