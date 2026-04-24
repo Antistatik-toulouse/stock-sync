@@ -1,0 +1,27 @@
+name: Sync Stock Toptex → Shopify
+
+on:
+  schedule:
+    - cron: '0 6,10,14,18 * * *'  # 6h, 10h, 14h, 18h (heure UTC = +2 en été)
+  workflow_dispatch:               # Déclenchement manuel possible
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Lancer la sync stock
+        run: node sync-stock.mjs
+        env:
+          SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
+          TOPTEX_PASSWORD: ${{ secrets.TOPTEX_PASSWORD }}
+          TOPTEX_API_KEY: ${{ secrets.TOPTEX_API_KEY }}
