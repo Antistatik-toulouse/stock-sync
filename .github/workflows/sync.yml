@@ -5,6 +5,9 @@ on:
     - cron: '0 6,10,14,18 * * *'  # 6h, 10h, 14h, 18h (heure UTC = +2 en été)
   workflow_dispatch:               # Déclenchement manuel possible
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
