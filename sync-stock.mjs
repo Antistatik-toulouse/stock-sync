@@ -96,7 +96,7 @@ async function main() {
   for (const product of products) {
     for (const variant of product.variants) {
       if (!variant.sku) continue;
-      const ref = variant.sku.split('-')[0].toUpperCase();
+      const ref = variant.sku.split(/[-,]/)[0].toUpperCase();
       if (!TOPTEX_REFS.has(ref) || !toptexStock[ref]) continue;
 
       // Couleur depuis le titre de variante (avant le /)
