@@ -78,7 +78,8 @@ async function main() {
       const byColor = {};
       for (const item of data.items) {
         const color = item.color?.trim().toUpperCase();
-        const stock = item.warehouses?.reduce((sum, w) => sum + (w.stock || 0), 0) || 0;
+        // Stock direct uniquement (entrepôt Toptex), pas le stock fabricant
+        const stock = item.warehouses?.find(w => w.id === 'toptex')?.stock || 0;
         byColor[color] = (byColor[color] || 0) + stock;
       }
       toptexStock[ref] = byColor;
