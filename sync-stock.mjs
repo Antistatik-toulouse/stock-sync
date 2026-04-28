@@ -138,8 +138,11 @@ async function main() {
       const ref = variant.sku.split(/[-,]/)[0].toUpperCase();
       if (!TOPTEX_REFS.has(ref) || !toptexStock[ref]) continue;
 
-      // Couleur depuis le titre de variante (avant le /), avec alias par ref si nom Shopify ≠ Toptex
-      const rawColor = variant.title.split('/')[0].trim().toUpperCase();
+      // Couleur depuis option1/option2 — certains produits (NS305) ont option1=taille, option2=couleur
+      const SIZE_PATTERN = /^(XXS|XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|\d{2,3})$/;
+      const opt1 = (variant.option1 || '').trim().toUpperCase();
+      const opt2 = (variant.option2 || '').trim().toUpperCase();
+      const rawColor = SIZE_PATTERN.test(opt1) && opt2 ? opt2 : opt1;
       const color = (COLOR_ALIASES[ref] || {})[rawColor] || rawColor;
       const stock = toptexStock[ref][color];
 
