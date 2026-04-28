@@ -124,11 +124,12 @@ async function main() {
 
   // Noms de couleurs Shopify → noms Toptex, par ref (quand ils diffèrent)
   const COLOR_ALIASES = {
-    'BG42':   { 'NAVY': 'FRENCH NAVY' },
-    'KP064':  { 'PINK': 'PALE PINK' },
-    'NS324':  { 'RASBERRY SORBET': 'RASPBERRY SORBET' },
-    'BG125J': { 'LIME': 'LIME GREEN' },
-    'B640':   { 'CHOCOLAT': 'CHOCOLATE', 'NAVY': 'FRENCH NAVY', 'ROYAL BLUE': 'BRIGHT ROYAL' },
+    'BG42':    { 'NAVY': 'FRENCH NAVY' },
+    'KP064':   { 'PINK': 'PALE PINK' },
+    'NS324':   { 'RASBERRY SORBET': 'RASPBERRY SORBET' },
+    'BG125J':  { 'LIME': 'LIME GREEN' },
+    'B640':    { 'CHOCOLAT': 'CHOCOLATE', 'NAVY': 'FRENCH NAVY', 'ROYAL BLUE': 'BRIGHT ROYAL' },
+    'CGTW02T': { 'MILLENNIAL KHAKY': 'MILLENNIAL KHAKI', 'PISTACHE': 'PISTACHIO' },
   };
 
   for (const product of products) {
