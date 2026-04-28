@@ -64,10 +64,34 @@ async function main() {
   const locationId = locRes.locations[0].id;
   console.log(`📍 Location Shopify: ${locRes.locations[0].name} (${locationId})`);
 
-  // 2. Produits Shopify
-  const { products } = await shopify('/products.json?limit=250&fields=id,title,variants');
+  // 2. Produits Shopify (sans variantes d'abord)
+  const { products } = await shopify('/products.json?limit=250&fields=id,title');
   if (!products) throw new Error('Shopify products invalide');
   console.log(`📦 ${products.length} produits Shopify chargés`);
+
+  // Charge toutes les variantes avec pagination (products.json tronque à 100/produit)
+  async function getAllVariants(productId) {
+    let variants = [];
+    let url = `/products/${productId}/variants.json?limit=250`;
+    while (url) {
+      const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${url}`, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' }
+      });
+      const linkHeader = res.headers.get('link');
+      const data = await res.json();
+      variants.push(...(data.variants || []));
+      const nextMatch = linkHeader?.match(/<([^>]+)>; rel="next"/);
+      url = nextMatch ? nextMatch[1].replace(`https://${SHOPIFY_STORE}/admin/api/2024-01`, '') : null;
+    }
+    return variants;
+  }
+
+  for (const product of products) {
+    product.variants = await getAllVariants(product.id);
+    await sleep(200);
+  }
+  const totalVariants = products.reduce((s, p) => s + p.variants.length, 0);
+  console.log(`🔢 ${totalVariants} variantes chargées au total`);
 
   // 3. Inventaire Toptex par ref
   console.log(`\n📡 Chargement inventaire Toptex...`);
@@ -81,6 +105,11 @@ async function main() {
         // Stock direct uniquement (entrepôt Toptex), pas le stock fabricant
         const stock = item.warehouses?.find(w => w.id === 'toptex')?.stock || 0;
         byColor[color] = (byColor[color] || 0) + stock;
+        // Pour les couleurs bicolores Toptex (ex: "FRENCH NAVY / WHITE"), indexer aussi par la première partie
+        const firstPart = color.split(' / ')[0].trim();
+        if (firstPart !== color) {
+          byColor[firstPart] = (byColor[firstPart] || 0) + stock;
+        }
       }
       toptexStock[ref] = byColor;
     }
@@ -93,14 +122,24 @@ async function main() {
   console.log(`\n📝 Mise à jour des stocks...`);
   let updated = 0, noMatch = 0, zeroStock = 0;
 
+  // Noms de couleurs Shopify → noms Toptex, par ref (quand ils diffèrent)
+  const COLOR_ALIASES = {
+    'BG42':   { 'NAVY': 'FRENCH NAVY' },
+    'KP064':  { 'PINK': 'PALE PINK' },
+    'NS324':  { 'RASBERRY SORBET': 'RASPBERRY SORBET' },
+    'BG125J': { 'LIME': 'LIME GREEN' },
+    'B640':   { 'CHOCOLAT': 'CHOCOLATE', 'NAVY': 'FRENCH NAVY', 'ROYAL BLUE': 'BRIGHT ROYAL' },
+  };
+
   for (const product of products) {
     for (const variant of product.variants) {
       if (!variant.sku) continue;
       const ref = variant.sku.split(/[-,]/)[0].toUpperCase();
       if (!TOPTEX_REFS.has(ref) || !toptexStock[ref]) continue;
 
-      // Couleur depuis le titre de variante (avant le /)
-      const color = variant.title.split('/')[0].trim().toUpperCase();
+      // Couleur depuis le titre de variante (avant le /), avec alias par ref si nom Shopify ≠ Toptex
+      const rawColor = variant.title.split('/')[0].trim().toUpperCase();
+      const color = (COLOR_ALIASES[ref] || {})[rawColor] || rawColor;
       const stock = toptexStock[ref][color];
 
       if (stock === undefined) { noMatch++; continue; }
