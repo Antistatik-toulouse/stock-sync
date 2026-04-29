@@ -134,6 +134,19 @@ async function main() {
     'BG125J':  { 'LIME': 'LIME GREEN' },
     'B640':    { 'CHOCOLAT': 'CHOCOLATE', 'NAVY': 'FRENCH NAVY', 'ROYAL BLUE': 'BRIGHT ROYAL' },
     'CGTW02T': { 'MILLENNIAL KHAKY': 'MILLENNIAL KHAKI', 'PISTACHE': 'PISTACHIO' },
+    'PA169':   {
+      'NAVY': 'SPORTY NAVY', 'WHITE': 'SPORTY WHITE', 'RED': 'SPORTY RED',
+      'ROYAL BLUE': 'SPORTY ROYAL BLUE', 'TROPICAL BLUE': 'TROPICAL BLUE',
+      'OLIVE': 'SPORTY OLIVE', 'BLACK': 'BLACK',
+    },
+    'YHVW100': {
+      'BLACK/HI VIS YELLOW': 'BLACK / HI VIS YELLOW',
+      'NAVY/HI VIS YELLOW':  'NAVY / HI VIS YELLOW',
+      'RED/HI VIS YELLOW':   'RED / HI VIS YELLOW',
+      'ROYAL BLUE/HI VIS YELLOW': 'ROYAL BLUE / HI VIS YELLOW',
+      'HI VIS YELLOW/BLACK': 'HI VIS YELLOW / BLACK',
+      'HI VIS ORANGE/BLACK': 'HI VIS ORANGE / BLACK',
+    },
   };
 
   for (const product of products) {
@@ -148,13 +161,16 @@ async function main() {
       const opt2 = (variant.option2 || '').trim().toUpperCase();
       const isOpt1Size = SIZE_PATTERN.test(opt1) && !!opt2;
       const rawColor = isOpt1Size ? opt2 : opt1;
-      const rawSize  = isOpt1Size ? opt1 : (SIZE_PATTERN.test(opt2) ? opt2 : '');
-      const color = (COLOR_ALIASES[ref] || {})[rawColor] || rawColor;
+      // rawSize : utilise opt2 tel quel (gère "ONE SIZE", "3/4 ANS", tailles XS/S/M...)
+      const rawSize = isOpt1Size ? opt1 : opt2;
+      // Normalise les slashes Shopify "BLACK/HI VIS" → "BLACK / HI VIS" pour matcher Toptex
+      const normalizedColor = rawColor.replace(/\s*\/\s*/g, ' / ');
+      const color = (COLOR_ALIASES[ref] || {})[normalizedColor] || normalizedColor;
 
       const colorMap = toptexStock[ref][color];
       if (!colorMap) { noMatch++; continue; }
-      // Stock par taille exacte, fallback sur '' (produits sans déclinaison taille dans l'API)
-      const stock = colorMap[rawSize] ?? colorMap[''];
+      // Lookup : taille exacte → '' (couleur sans taille) → 'ONE SIZE'
+      const stock = colorMap[rawSize] ?? colorMap[''] ?? colorMap['ONE SIZE'];
 
       if (stock === undefined) { noMatch++; continue; }
 
