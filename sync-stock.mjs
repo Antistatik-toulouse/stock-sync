@@ -95,23 +95,27 @@ async function main() {
 
   // 3. Inventaire Toptex par ref
   console.log(`\n📡 Chargement inventaire Toptex...`);
-  const toptexStock = {}; // ref -> { COLOR: totalStock }
+  const toptexStock = {}; // ref -> { COLOR -> { SIZE -> stock } }
   for (const ref of TOPTEX_REFS) {
     const data = await toptex(`/v3/products/inventory?catalog_reference=${ref}`);
     if (data.items?.length) {
-      const byColor = {};
+      const byColorSize = {};
       for (const item of data.items) {
         const color = item.color?.trim().toUpperCase().replace(/\s+/g, ' ');
+        // '' quand l'API ne renvoie pas de taille (produits sans déclinaison taille)
+        const size = (item.size?.trim().toUpperCase().replace(/\s+/g, ' ')) || '';
         // Stock direct uniquement (entrepôt Toptex), pas le stock fabricant
         const stock = item.warehouses?.find(w => w.id === 'toptex')?.stock || 0;
-        byColor[color] = (byColor[color] || 0) + stock;
+        if (!byColorSize[color]) byColorSize[color] = {};
+        byColorSize[color][size] = (byColorSize[color][size] || 0) + stock;
         // Pour les couleurs bicolores Toptex (ex: "FRENCH NAVY / WHITE"), indexer aussi par la première partie
         const firstPart = color.split(' / ')[0].trim();
         if (firstPart !== color) {
-          byColor[firstPart] = (byColor[firstPart] || 0) + stock;
+          if (!byColorSize[firstPart]) byColorSize[firstPart] = {};
+          byColorSize[firstPart][size] = (byColorSize[firstPart][size] || 0) + stock;
         }
       }
-      toptexStock[ref] = byColor;
+      toptexStock[ref] = byColorSize;
     }
     await sleep(100);
     process.stdout.write('.');
@@ -138,13 +142,19 @@ async function main() {
       const ref = variant.sku.split(/[-,]/)[0].toUpperCase();
       if (!TOPTEX_REFS.has(ref) || !toptexStock[ref]) continue;
 
-      // Couleur depuis option1/option2 — certains produits (NS305) ont option1=taille, option2=couleur
+      // Couleur et taille depuis option1/option2
       const SIZE_PATTERN = /^(XXS|XS|S|M|L|XL|XXL|2XL|3XL|4XL|5XL|\d{2,3})$/;
       const opt1 = (variant.option1 || '').trim().toUpperCase();
       const opt2 = (variant.option2 || '').trim().toUpperCase();
-      const rawColor = SIZE_PATTERN.test(opt1) && opt2 ? opt2 : opt1;
+      const isOpt1Size = SIZE_PATTERN.test(opt1) && !!opt2;
+      const rawColor = isOpt1Size ? opt2 : opt1;
+      const rawSize  = isOpt1Size ? opt1 : (SIZE_PATTERN.test(opt2) ? opt2 : '');
       const color = (COLOR_ALIASES[ref] || {})[rawColor] || rawColor;
-      const stock = toptexStock[ref][color];
+
+      const colorMap = toptexStock[ref][color];
+      if (!colorMap) { noMatch++; continue; }
+      // Stock par taille exacte, fallback sur '' (produits sans déclinaison taille dans l'API)
+      const stock = colorMap[rawSize] ?? colorMap[''];
 
       if (stock === undefined) { noMatch++; continue; }
 
