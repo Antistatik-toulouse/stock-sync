@@ -65,13 +65,22 @@ function colorCandidates(colorName) {
   }
   // Garder aussi le nom brut normalisé (cas comme TURQUOISE SURF → TURQUOISE)
   candidates.add(words[0]); // premier mot seul
-  // Cas spéciaux connus
+  // Cas spéciaux connus — certains SKUs Shopify utilisent un format différent
   const aliases = {
-    'TURQUOISE SURF': 'TURQUOISE',
-    'CANDYFLOSS PINK': 'CANDY+FLOSS+PINK',
-    'CANDY FLOSS PINK': 'CANDY+FLOSS+PINK',
+    'TURQUOISE SURF':         ['TURQUOISE'],
+    'CANDYFLOSS PINK':        ['CANDY+FLOSS+PINK', 'CANDY-FLOSS-PINK'],
+    'CANDY FLOSS PINK':       ['CANDY+FLOSS+PINK', 'CANDY-FLOSS-PINK'],
+    'PEPPERMINT':             ['PEPPER-MINT', 'PEPPERMINT'],
+    'ORANGE CRUSH':           ['ORANGE-CRUSH', 'ORANGE+CRUSH'],
+    'CHOCOLATE FUDGE BROWNIE':['CHOCOLATE+FUDGE+BROWN', 'CHOCOLATE-FUDGE-BROWNIE', 'CHOCOLATE+FUDGE+BROWNIE'],
+    'OXFORD NAVY/HEATHER GREY':['OXFORD-NAVY-HEATHER', 'OXFORD+NAVY+HEATHER+GREY', 'OXFORD-NAVY-HEATHER-GREY'],
+    'GRAPHITE HEATHER':       ['GRAPHITE+HEATHER', 'GRAPHITE-HEATHER'],
+    'CARAMEL LATTE':          ['CARAMEL+LATTE', 'CARAMEL-LATTE'],
+    'DEEP BLACK':             ['DEEP+BLACK', 'DEEP-BLACK'],
+    'LAVENDER':               ['LAVENDER'],
   };
-  if (aliases[name]) candidates.add(aliases[name]);
+  const extra = aliases[name];
+  if (extra) extra.forEach(a => candidates.add(a));
   return [...candidates];
 }
 
