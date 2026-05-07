@@ -10,11 +10,11 @@ const require = createRequire(import.meta.url);
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
-// ── Credentials (depuis env ou valeurs preprod) ───────────────
+// ── Credentials ──────────────────────────────────────────────
 const SHOPIFY_TOKEN    = process.env.SHOPIFY_TOKEN;
 const SHOPIFY_STORE    = process.env.SHOPIFY_STORE    || 'antistatiksamedi.myshopify.com';
 const IMBRE_TOKEN_V1   = process.env.IMBRE_TOKEN_V1;
-const IMBRE_BASE_V1    = process.env.IMBRE_BASE       || 'https://api.preprod.imbretex-upgrade.hegyd.net/api';
+const IMBRE_BASE_V1    = process.env.IMBRE_BASE       || 'https://api.imbretex.fr/api';
 
 if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 if (!IMBRE_TOKEN_V1) throw new Error('IMBRE_TOKEN_V1 manquant');
