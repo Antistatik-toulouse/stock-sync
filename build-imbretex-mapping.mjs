@@ -78,6 +78,7 @@ function colorCandidates(colorName) {
     'CARAMEL LATTE':          ['CARAMEL+LATTE', 'CARAMEL-LATTE'],
     'DEEP BLACK':             ['DEEP+BLACK', 'DEEP-BLACK'],
     'LAVENDER':               ['LAVENDER'],
+    'ROYAL/WHITE':            ['ROYAL-BLUE-WHITE', 'ROYAL-WHITE', 'ROYAL+WHITE'],
   };
   const extra = aliases[name];
   if (extra) extra.forEach(a => candidates.add(a));
