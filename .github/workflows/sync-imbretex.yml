@@ -1,0 +1,28 @@
+name: Sync Stock Imbretex → Shopify
+
+on:
+  schedule:
+    - cron: '30 6,10,14,18 * * *'  # 8h30, 12h30, 16h30, 20h30 (heure Paris été)
+  workflow_dispatch:                 # Déclenchement manuel possible
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sync stocks Imbretex → Shopify
+        run: node sync-imbretex.mjs
+        env:
+          SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
+          IMBRE_TOKEN_V1: ${{ secrets.IMBRE_TOKEN_V1 }}
+          IMBRE_BASE: ${{ secrets.IMBRE_BASE }}
+          SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
