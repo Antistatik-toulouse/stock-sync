@@ -112,25 +112,25 @@ async function main() {
   const locRes = await shopifyGql(`{ locations(first:1) { edges { node { id } } } }`);
   const locationId = locRes.data.locations.edges[0].node.id;
 
-  // 4. Calculer les mises à jour
+  // 4. Calculer les mises à jour (dédupliquer par inventoryItemId — plusieurs codes Imbretex peuvent pointer le même SKU)
   console.log('3. Calcul des mises à jour...');
-  const updates = [];
+  const byInvItem = new Map(); // inventoryItemId → { sku, stock cumulé, oldStock }
   let skipped = 0;
 
-  for (const [imbreCode, newStock] of Object.entries(imbreStocks)) {
+  for (const [imbreCode, stock] of Object.entries(imbreStocks)) {
     const sku = IMBRE_TO_SKU[imbreCode];
     if (!sku) { skipped++; continue; }
     const variant = shopifyBySku[sku];
     if (!variant) { skipped++; continue; }
-    if (variant.inventoryQuantity !== newStock) {
-      updates.push({
-        inventoryItemId: variant.inventoryItem.id,
-        sku,
-        newStock,
-        oldStock: variant.inventoryQuantity,
-      });
+    const itemId = variant.inventoryItem.id;
+    if (byInvItem.has(itemId)) {
+      byInvItem.get(itemId).newStock += stock; // cumul si doublon
+    } else {
+      byInvItem.set(itemId, { inventoryItemId: itemId, sku, newStock: stock, oldStock: variant.inventoryQuantity });
     }
   }
+
+  const updates = [...byInvItem.values()].filter(u => u.oldStock !== u.newStock);
   console.log(`   ✅ ${updates.length} variants à mettre à jour (${skipped} sans correspondance)\n`);
 
   if (updates.length === 0) {
