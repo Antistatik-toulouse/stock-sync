@@ -58,7 +58,7 @@ async function fetchShopifyVariants() {
   do {
     const res = await shopifyGql(`
       query($cursor: String) {
-        products(first: 50, query: "sku:JH* OR sku:BF*", after: $cursor) {
+        products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
           pageInfo { hasNextPage endCursor }
           edges {
             node {
@@ -106,11 +106,13 @@ async function main() {
   // 2. Variants Shopify
   console.log('2. Variants Shopify...');
   const shopifyBySku = await fetchShopifyVariants();
-  console.log(`   ✅ ${Object.keys(shopifyBySku).length} variants JH*/BF*\n`);
+  console.log(`   ✅ ${Object.keys(shopifyBySku).length} variants\n`);
 
-  // 3. Location
-  const locRes = await shopifyGql(`{ locations(first:1) { edges { node { id } } } }`);
-  const locationId = locRes.data.locations.edges[0].node.id;
+  // 3. Location Imbretex
+  const locRes = await shopifyGql(`{ locations(first:10) { edges { node { id name } } } }`);
+  const imbreLocation = locRes.data.locations.edges.find(e => e.node.name === 'Imbretex');
+  if (!imbreLocation) throw new Error('Emplacement "Imbretex" introuvable dans Shopify');
+  const locationId = imbreLocation.node.id;
 
   // 4. Calculer les mises à jour (dédupliquer par inventoryItemId — plusieurs codes Imbretex peuvent pointer le même SKU)
   console.log('3. Calcul des mises à jour...');

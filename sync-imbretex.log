@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-07T10:31:23.247Z",
+  "updated": 7,
+  "errors": 0,
+  "samples": [
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239928667",
+      "sku": "JH001-BURGUNDY-3XL",
+      "newStock": 4,
+      "oldStock": 39
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239830363",
+      "sku": "JH001-BURGUNDY-L",
+      "newStock": 88,
+      "oldStock": 1407
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239797595",
+      "sku": "JH001-BURGUNDY-M",
+      "newStock": 35,
+      "oldStock": 720
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239764827",
+      "sku": "JH001-BURGUNDY-S",
+      "newStock": 159,
+      "oldStock": 279
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239863131",
+      "sku": "JH001-BURGUNDY-XL",
+      "newStock": 10,
+      "oldStock": 738
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239732059",
+      "sku": "JH001-BURGUNDY-XS",
+      "newStock": 21,
+      "oldStock": 162
+    },
+    {
+      "inventoryItemId": "gid://shopify/InventoryItem/53798239895899",
+      "sku": "JH001-BURGUNDY-XXL",
+      "newStock": 9,
+      "oldStock": 127
+    }
+  ]
+}

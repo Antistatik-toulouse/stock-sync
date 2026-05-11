@@ -76,11 +76,12 @@ async function main() {
 
   console.log(`\n🔄 Sync stock démarrée — ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`);
 
-  // 1. Location Shopify
+  // 1. Location Toptex
   const locRes = await shopify('/locations.json');
-  if (!locRes.locations?.length) throw new Error(`Shopify locations invalide: ${JSON.stringify(locRes)}`);
-  const locationId = locRes.locations[0].id;
-  console.log(`📍 Location Shopify: ${locRes.locations[0].name} (${locationId})`);
+  const toptexLoc = locRes.locations?.find(l => l.name === 'Toptex');
+  if (!toptexLoc) throw new Error('Emplacement "Toptex" introuvable dans Shopify');
+  const locationId = toptexLoc.id;
+  console.log(`📍 Location Toptex: ${locationId}`);
 
   // 2. Produits Shopify (sans variantes d'abord)
   const { products } = await shopify('/products.json?limit=250&fields=id,title');

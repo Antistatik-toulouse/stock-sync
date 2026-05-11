@@ -24,7 +24,7 @@ async function fetchShopifySkus() {
       headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: `query($cursor: String) {
-          products(first: 50, query: "sku:JH* OR sku:BF*", after: $cursor) {
+          products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
             pageInfo { hasNextPage endCursor }
             edges { node { variants(first: 250) { edges { node { sku } } } } }
           }
@@ -49,7 +49,8 @@ function readXls() {
   const wb = XLSX.readFile('/Users/antistatik/Shopify x Claude/LL 27042026 Client.xlsx');
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-  const ourRefs = ['JH001','JH01J','JH030','JH030J','JH043','JH043J','JH050','JH050J','BF789','BF090N'];
+  const ourRefs = ['JH001','JH01J','JH030','JH030J','JH043','JH043J','JH050','JH050J','BF789','BF090N',
+                   'BF640','BF640B','BG042','BY102','BC03T','BF015','BC02T'];
   return data.slice(1).filter(row => ourRefs.includes(row[2]));
 }
 
@@ -104,6 +105,18 @@ function sizeCandidates(sizeCode) {
   return [...candidates];
 }
 
+// ── Refs Imbretex qui correspondent à des produits Toptex dans Shopify ──
+// Le SKU Shopify utilise le format Toptex (ex: B640-BLACK-XS)
+const CROSS_REF = {
+  'BF640':  'B640',
+  'BF640B': 'B640B',
+  'BG042':  'BG42',
+  'BY102':  'BY102',
+  'BC03T':  'CGTU03T',
+  'BF015':  'B15',
+  'BC02T':  'CGTW02T',
+};
+
 // ── Main ──────────────────────────────────────────────────────
 async function main() {
   const shopifySkus = await fetchShopifySkus();
@@ -125,10 +138,13 @@ async function main() {
 
     let found = null;
 
+    // Pour les refs croisées, chercher avec le prefix Shopify Toptex
+    const shopifyRef = CROSS_REF[ref] || ref;
+
     // Taille unique (BF789, size=0)
     if (sizeCode === '0' || sizeCode === '') {
       for (const colorSlug of colorCandidates(colorName)) {
-        const candidate = `${ref}-${colorSlug}`;
+        const candidate = `${shopifyRef}-${colorSlug}`;
         if (shopifySkus.has(candidate)) { found = candidate; break; }
       }
     } else {
@@ -136,7 +152,7 @@ async function main() {
       outer:
       for (const colorSlug of colorCandidates(colorName)) {
         for (const sizeSlug of sizeCandidates(sizeCode)) {
-          const candidate = `${ref}-${colorSlug}-${sizeSlug}`;
+          const candidate = `${shopifyRef}-${colorSlug}-${sizeSlug}`;
           if (shopifySkus.has(candidate)) { found = candidate; break outer; }
         }
       }

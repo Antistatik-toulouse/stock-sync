@@ -1,0 +1,268 @@
+
+🔄 Sync stock démarrée — 28/04/2026 16:41:44
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5275 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3541
+   Stock à 0    : 3
+   Non matchés  : 117
+  
+
+🔄 Sync stock démarrée — 29/04/2026 12:00:02
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5275 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3541
+   Stock à 0    : 4
+   Non matchés  : 117
+  
+
+🔄 Sync stock démarrée — 29/04/2026 16:00:05
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5275 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+❌ Erreur: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+    at JSON.parse (<anonymous>)
+    at parseJSONFromBytes (node:internal/deps/undici/undici:5738:19)
+    at successSteps (node:internal/deps/undici/undici:5719:27)
+    at fullyReadBody (node:internal/deps/undici/undici:4609:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async consumeBody (node:internal/deps/undici/undici:5728:7)
+    at async main (file:///Users/antistatik/Shopify%20x%20Claude/stock-sync/sync-stock.mjs:173:7)
+
+🔄 Sync stock démarrée — 30/04/2026 12:00:04
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5275 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 84
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 30/04/2026 16:00:06
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5275 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 80
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 02/05/2026 12:00:04
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 4170 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 2563
+   Stock à 0    : 60
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 02/05/2026 16:00:01
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5277 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 79
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 04/05/2026 12:00:01
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5278 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 76
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 04/05/2026 16:00:04
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+🔄 Sync stock démarrée — 05/05/2026 12:00:05
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 83
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 05/05/2026 16:00:04
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 81
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 06/05/2026 12:00:04
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 82
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 06/05/2026 16:00:01
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 87
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 07/05/2026 12:00:01
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 66 produits Shopify chargés
+🔢 5280 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 93
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 07/05/2026 16:00:01
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5278 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 91
+   Non matchés  : 148
+  
+
+🔄 Sync stock démarrée — 11/05/2026 12:00:05
+📍 Location Shopify: Antistatik à Toulouse (105262547291)
+📦 65 produits Shopify chargés
+🔢 5273 variantes chargées au total
+
+📡 Chargement inventaire Toptex...
+.......................................
+✅ Inventaire chargé pour 39 refs
+
+📝 Mise à jour des stocks...
+
+✅ Sync terminée !
+   Mises à jour : 3510
+   Stock à 0    : 101
+   Non matchés  : 148
+  
