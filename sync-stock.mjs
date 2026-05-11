@@ -40,14 +40,32 @@ async function toptex(path) {
   return res.json();
 }
 
-async function shopify(path, method = 'GET', body = null) {
+async function shopify(path, method = 'GET', body = null, retries = 5) {
   const opts = {
     method,
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${path}`, opts);
-  return res.json();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${path}`, opts);
+    if (res.status === 429) {
+      const wait = parseInt(res.headers.get('Retry-After') || '10', 10) * 1000;
+      await sleep(wait);
+      continue;
+    }
+    if (res.status >= 500) {
+      await sleep(2000 * (attempt + 1));
+      continue;
+    }
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (attempt < retries - 1) { await sleep(2000); continue; }
+      throw new Error(`Shopify réponse invalide (${res.status}): ${text.slice(0, 100)}`);
+    }
+  }
+  throw new Error(`Shopify ${method} ${path} échoué après ${retries} tentatives`);
 }
 
 // --- Main ---
@@ -103,7 +121,7 @@ async function main() {
       for (const item of data.items) {
         const color = item.color?.trim().toUpperCase().replace(/\s+/g, ' ');
         // '' quand l'API ne renvoie pas de taille (produits sans déclinaison taille)
-        const size = (item.size?.trim().toUpperCase().replace(/\s+/g, ' ')) || '';
+        const size = (item.size?.trim().toUpperCase().replace(/\s+/g, ' ').replace(/ EU$/, '')) || '';
         // Stock direct uniquement (entrepôt Toptex), pas le stock fabricant
         const stock = item.warehouses?.find(w => w.id === 'toptex')?.stock || 0;
         if (!byColorSize[color]) byColorSize[color] = {};
@@ -134,11 +152,7 @@ async function main() {
     'BG125J':  { 'LIME': 'LIME GREEN' },
     'B640':    { 'CHOCOLAT': 'CHOCOLATE', 'NAVY': 'FRENCH NAVY', 'ROYAL BLUE': 'BRIGHT ROYAL' },
     'CGTW02T': { 'MILLENNIAL KHAKY': 'MILLENNIAL KHAKI', 'PISTACHE': 'PISTACHIO' },
-    'PA169':   {
-      'NAVY': 'SPORTY NAVY', 'WHITE': 'SPORTY WHITE', 'RED': 'SPORTY RED',
-      'ROYAL BLUE': 'SPORTY ROYAL BLUE', 'TROPICAL BLUE': 'TROPICAL BLUE',
-      'OLIVE': 'SPORTY OLIVE', 'BLACK': 'BLACK',
-    },
+    'PA169':   { 'NAVY': 'SPORTY NAVY' },
     'YHVW100': {
       'BLACK/HI VIS YELLOW': 'BLACK / HI VIS YELLOW',
       'NAVY/HI VIS YELLOW':  'NAVY / HI VIS YELLOW',
@@ -182,7 +196,7 @@ async function main() {
 
       if (stock === 0) zeroStock++;
       updated++;
-      await sleep(300);
+      await sleep(550);
     }
   }
 
