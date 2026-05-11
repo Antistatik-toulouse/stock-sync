@@ -13,11 +13,24 @@ const DRY_RUN = process.argv.includes('--dry-run');
 // ── Credentials ──────────────────────────────────────────────
 const SHOPIFY_TOKEN    = process.env.SHOPIFY_TOKEN;
 const SHOPIFY_STORE    = process.env.SHOPIFY_STORE    || 'antistatiksamedi.myshopify.com';
-const IMBRE_TOKEN_V1   = process.env.IMBRE_TOKEN_V1;
-const IMBRE_BASE_V1    = process.env.IMBRE_BASE       || 'https://api.imbretex.fr/api';
+const IMBRE_CLIENT_ID  = process.env.IMBRE_CLIENT_ID;
+const IMBRE_CLIENT_SECRET = process.env.IMBRE_CLIENT_SECRET;
+const IMBRE_BASE_V2    = 'https://api.imbretex.fr/api/v2';
 
 if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
-if (!IMBRE_TOKEN_V1) throw new Error('IMBRE_TOKEN_V1 manquant');
+if (!IMBRE_CLIENT_ID || !IMBRE_CLIENT_SECRET) throw new Error('IMBRE_CLIENT_ID / IMBRE_CLIENT_SECRET manquants');
+
+// Obtenir le token OAuth2
+async function getImbreToken() {
+  const r = await fetch(`${IMBRE_BASE_V2}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: IMBRE_CLIENT_ID, client_secret: IMBRE_CLIENT_SECRET })
+  });
+  const d = await r.json();
+  if (!d.access_token) throw new Error('Token Imbretex invalide: ' + JSON.stringify(d));
+  return d.access_token;
+}
 
 // ── Mapping Imbretex code → SKU Shopify (généré depuis line listing) ──
 // Format: imbreCode → SKU Shopify attendu
@@ -35,18 +48,31 @@ async function shopifyGql(query, variables = {}) {
 
 async function fetchAllImbreStocks() {
   const stocks = {};
-  let page = 1;
-  console.log('  Téléchargement stocks Imbretex...');
+  const token = await getImbreToken();
+  let page = 1, totalPages = 1;
+  console.log('  Téléchargement stocks Imbretex (V2)...');
   do {
-    const r = await fetch(`${IMBRE_BASE_V1}/products/stocks?page=${page}&perPage=5000`, {
-      headers: { Authorization: 'Bearer ' + IMBRE_TOKEN_V1, Accept: 'application/json' }
-    });
-    const d = await r.json();
-    if (!d.stocks) throw new Error('Stocks invalides: ' + JSON.stringify(d).slice(0, 200));
-    for (const s of d.stocks) stocks[s.variantReference] = parseInt(s.stock, 10) || 0;
-    process.stdout.write(`\r  Page ${page}/${d.totalNumberPage} — ${Object.keys(stocks).length} codes`);
-    if (page >= d.totalNumberPage) break;
+    let d;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const r = await fetch(`${IMBRE_BASE_V2}/stocks?page=${page}&perPage=100`, {
+        headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' }
+      });
+      if (r.status === 429) {
+        const wait = parseInt(r.headers.get('Retry-After') || '10') * 1000;
+        await new Promise(res => setTimeout(res, wait || 15000));
+        continue;
+      }
+      const text = await r.text();
+      try { d = JSON.parse(text); } catch { await new Promise(res => setTimeout(res, 3000)); continue; }
+      break;
+    }
+    if (!d?.data) throw new Error('Stocks invalides: ' + JSON.stringify(d).slice(0, 200));
+    for (const s of d.data) stocks[s.code] = parseInt(s.stock, 10) || 0;
+    totalPages = d.totalPages || 1;
+    process.stdout.write(`\r  Page ${page}/${totalPages} — ${Object.keys(stocks).length} codes`);
+    if (page >= totalPages) break;
     page++;
+    await new Promise(res => setTimeout(res, 500)); // 500ms entre pages ≈ 2 req/s
   } while (true);
   console.log();
   return stocks;

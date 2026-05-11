@@ -18,11 +18,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
+
+      - name: Installer les dépendances
+        run: npm install
 
       - name: Sync stocks Imbretex → Shopify
         run: node sync-imbretex.mjs
         env:
           SHOPIFY_TOKEN: ${{ secrets.SHOPIFY_TOKEN }}
-          IMBRE_TOKEN_V1: ${{ secrets.IMBRE_TOKEN_V1 }}
-          IMBRE_BASE: ${{ secrets.IMBRE_BASE }}
+          IMBRE_CLIENT_ID: ${{ secrets.IMBRE_CLIENT_ID }}
+          IMBRE_CLIENT_SECRET: ${{ secrets.IMBRE_CLIENT_SECRET }}
           SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
