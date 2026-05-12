@@ -194,6 +194,36 @@ async function main() {
     return;
   }
 
+  // 4b. Connecter les items non encore rattachés à l'emplacement Imbretex
+  const locationNumericId = locationId.split('/').pop();
+  const allItemIds = updates.map(u => u.inventoryItemId.split('/').pop());
+  const toConnect = [];
+
+  for (let i = 0; i < allItemIds.length; i += 50) {
+    const chunk = allItemIds.slice(i, i + 50);
+    const levRes = await fetch(
+      `https://${SHOPIFY_STORE}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${chunk.join(',')}&location_ids=${locationNumericId}`,
+      { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
+    ).then(r => r.json());
+    const connected = new Set((levRes.inventory_levels || []).map(l => String(l.inventory_item_id)));
+    for (const id of chunk) { if (!connected.has(id)) toConnect.push(id); }
+  }
+
+  if (toConnect.length > 0) {
+    console.log(`   Connexion de ${toConnect.length} items à l'emplacement Imbretex...`);
+    let connected = 0;
+    for (const itemId of toConnect) {
+      await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/inventory_levels/connect.json`, {
+        method: 'POST',
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location_id: locationNumericId, inventory_item_id: itemId, relocate_if_necessary: false })
+      });
+      connected++;
+      await new Promise(r => setTimeout(r, 200));
+    }
+    console.log(`   ✅ ${connected} items connectés\n`);
+  }
+
   // 5. Mise à jour Shopify par batch de 250
   console.log(`4. Mise à jour Shopify...`);
   const BATCH = 250;
