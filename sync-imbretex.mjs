@@ -6,6 +6,7 @@
 
 import { writeFileSync } from 'fs';
 import { createRequire } from 'module';
+import { getAllProductIds, getAllVariants, ensureStockedAtLocation } from './shopify-utils.mjs';
 const require = createRequire(import.meta.url);
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -79,46 +80,18 @@ async function fetchAllImbreStocks() {
 }
 
 async function fetchShopifyVariants() {
-  // Étape 1 : récupérer les IDs produits via GraphQL (sans limite sur les variants)
-  const productIds = [];
-  let cursor = null;
-  do {
-    const res = await shopifyGql(`
-      query($cursor: String) {
-        products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
-          pageInfo { hasNextPage endCursor }
-          edges { node { id } }
-        }
-      }
-    `, { cursor });
-    for (const { node: p } of res.data?.products?.edges || []) productIds.push(p.id);
-    cursor = res.data?.products?.pageInfo?.hasNextPage
-      ? res.data?.products?.pageInfo?.endCursor
-      : null;
-  } while (cursor);
-
-  // Étape 2 : pour chaque produit, charger TOUS les variants via REST (paginé)
+  const products = await getAllProductIds(SHOPIFY_STORE, SHOPIFY_TOKEN,
+    'sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*');
   const bysku = {};
-  for (const gid of productIds) {
-    const numericId = gid.split('/').pop();
-    let url = `/products/${numericId}/variants.json?limit=250`;
-    while (url) {
-      const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${url}`, {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
-      });
-      const link = res.headers.get('link');
-      const data = await res.json();
-      for (const v of data.variants || []) {
-        if (v.sku) bysku[v.sku] = {
-          sku: v.sku,
-          inventoryItem: { id: `gid://shopify/InventoryItem/${v.inventory_item_id}` },
-          inventoryQuantity: v.inventory_quantity
-        };
-      }
-      const next = link?.match(/<([^>]+)>; rel="next"/);
-      url = next ? next[1].replace(`https://${SHOPIFY_STORE}/admin/api/2024-01`, '') : null;
+  for (const p of products) {
+    const variants = await getAllVariants(SHOPIFY_STORE, SHOPIFY_TOKEN, p.id);
+    for (const v of variants) {
+      if (v.sku) bysku[v.sku] = {
+        sku: v.sku,
+        inventoryItem: { id: `gid://shopify/InventoryItem/${v.inventory_item_id}` },
+        inventoryQuantity: v.inventory_quantity
+      };
     }
-    await new Promise(r => setTimeout(r, 200));
   }
   return bysku;
 }
@@ -197,32 +170,8 @@ async function main() {
   // 4b. Connecter les items non encore rattachés à l'emplacement Imbretex
   const locationNumericId = locationId.split('/').pop();
   const allItemIds = updates.map(u => u.inventoryItemId.split('/').pop());
-  const toConnect = [];
-
-  for (let i = 0; i < allItemIds.length; i += 50) {
-    const chunk = allItemIds.slice(i, i + 50);
-    const levRes = await fetch(
-      `https://${SHOPIFY_STORE}/admin/api/2024-01/inventory_levels.json?inventory_item_ids=${chunk.join(',')}&location_ids=${locationNumericId}`,
-      { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
-    ).then(r => r.json());
-    const connected = new Set((levRes.inventory_levels || []).map(l => String(l.inventory_item_id)));
-    for (const id of chunk) { if (!connected.has(id)) toConnect.push(id); }
-  }
-
-  if (toConnect.length > 0) {
-    console.log(`   Connexion de ${toConnect.length} items à l'emplacement Imbretex...`);
-    let connected = 0;
-    for (const itemId of toConnect) {
-      await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/inventory_levels/connect.json`, {
-        method: 'POST',
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location_id: locationNumericId, inventory_item_id: itemId, relocate_if_necessary: false })
-      });
-      connected++;
-      await new Promise(r => setTimeout(r, 200));
-    }
-    console.log(`   ✅ ${connected} items connectés\n`);
-  }
+  const connected = await ensureStockedAtLocation(SHOPIFY_STORE, SHOPIFY_TOKEN, allItemIds, locationNumericId);
+  if (connected > 0) console.log(`   ✅ ${connected} items connectés à Imbretex\n`);
 
   // 5. Mise à jour Shopify par batch de 250
   console.log(`4. Mise à jour Shopify...`);

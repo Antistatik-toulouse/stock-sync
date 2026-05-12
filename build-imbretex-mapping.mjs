@@ -6,6 +6,7 @@
 
 import { readFileSync, writeFileSync } from 'fs';
 import { createRequire } from 'module';
+import { getAllProductIds, getAllVariants } from './shopify-utils.mjs';
 const require = createRequire(import.meta.url);
 const XLSX = require('./node_modules/xlsx');
 
@@ -15,48 +16,15 @@ if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
 // ── 1. Charger tous les SKUs Shopify JH*/BF* ──────────────────
 async function fetchShopifySkus() {
-  // Étape 1 : récupérer tous les IDs produit via GraphQL
-  const productIds = [];
-  let cursor = null;
-  process.stdout.write('Chargement produits Shopify...');
-  do {
-    const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
-      method: 'POST',
-      headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `query($cursor: String) {
-          products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
-            pageInfo { hasNextPage endCursor }
-            edges { node { id } }
-          }
-        }`,
-        variables: { cursor }
-      })
-    }).then(r => r.json());
-    for (const { node: p } of res.data?.products?.edges || []) productIds.push(p.id);
-    cursor = res.data?.products?.pageInfo?.hasNextPage
-      ? res.data?.products?.pageInfo?.endCursor : null;
-  } while (cursor);
-  process.stdout.write(` ${productIds.length} produits`);
-
-  // Étape 2 : pour chaque produit, récupérer TOUS les variants via REST (paginé)
+  process.stdout.write('Chargement SKUs Shopify...');
+  const products = await getAllProductIds(SHOPIFY_STORE, SHOPIFY_TOKEN,
+    'sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*');
   const skus = new Set();
-  for (const gid of productIds) {
-    const numericId = gid.split('/').pop();
-    let url = `/products/${numericId}/variants.json?limit=250&fields=sku`;
-    while (url) {
-      const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${url}`, {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
-      });
-      const link = res.headers.get('link');
-      const data = await res.json();
-      for (const v of data.variants || []) { if (v.sku) skus.add(v.sku); }
-      const next = link?.match(/<([^>]+)>; rel="next"/);
-      url = next ? next[1].replace(`https://${SHOPIFY_STORE}/admin/api/2024-01`, '') : null;
-    }
-    await new Promise(r => setTimeout(r, 200));
+  for (const p of products) {
+    const variants = await getAllVariants(SHOPIFY_STORE, SHOPIFY_TOKEN, p.id);
+    for (const v of variants) { if (v.sku) skus.add(v.sku); }
   }
-  console.log(` → ${skus.size} SKUs trouvés`);
+  console.log(` ${products.length} produits → ${skus.size} SKUs trouvés`);
   return skus;
 }
 
