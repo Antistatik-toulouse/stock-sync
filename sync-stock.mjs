@@ -184,8 +184,13 @@ async function main() {
 
       const colorMap = toptexStock[ref][color];
       if (!colorMap) { noMatch++; continue; }
-      // Lookup : taille exacte → '' (couleur sans taille) → 'ONE SIZE'
-      const stock = colorMap[rawSize] ?? colorMap[''] ?? colorMap['ONE SIZE'];
+      // Normalise les tailles Shopify vers format Toptex
+      // "3 MOIS" → "3M", "6 MOIS" → "6M", etc.
+      const normalizedSize = rawSize
+        .replace(/^(\d+)\s+MOIS$/, '$1M')
+        .replace(/^(\d+)\s+ANS$/, '$1Y');
+      // Lookup : taille normalisée → taille exacte → '' → 'ONE SIZE'
+      const stock = colorMap[normalizedSize] ?? colorMap[rawSize] ?? colorMap[''] ?? colorMap['ONE SIZE'];
 
       if (stock === undefined) { noMatch++; continue; }
 
