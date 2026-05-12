@@ -79,32 +79,47 @@ async function fetchAllImbreStocks() {
 }
 
 async function fetchShopifyVariants() {
-  const bysku = {};
+  // Étape 1 : récupérer les IDs produits via GraphQL (sans limite sur les variants)
+  const productIds = [];
   let cursor = null;
   do {
     const res = await shopifyGql(`
       query($cursor: String) {
         products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
           pageInfo { hasNextPage endCursor }
-          edges {
-            node {
-              variants(first: 250) {
-                edges { node { sku inventoryItem { id } inventoryQuantity } }
-              }
-            }
-          }
+          edges { node { id } }
         }
       }
     `, { cursor });
-    for (const { node: p } of res.data?.products?.edges || []) {
-      for (const { node: v } of p.variants.edges) {
-        if (v.sku) bysku[v.sku] = v;
-      }
-    }
+    for (const { node: p } of res.data?.products?.edges || []) productIds.push(p.id);
     cursor = res.data?.products?.pageInfo?.hasNextPage
       ? res.data?.products?.pageInfo?.endCursor
       : null;
   } while (cursor);
+
+  // Étape 2 : pour chaque produit, charger TOUS les variants via REST (paginé)
+  const bysku = {};
+  for (const gid of productIds) {
+    const numericId = gid.split('/').pop();
+    let url = `/products/${numericId}/variants.json?limit=250`;
+    while (url) {
+      const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${url}`, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
+      });
+      const link = res.headers.get('link');
+      const data = await res.json();
+      for (const v of data.variants || []) {
+        if (v.sku) bysku[v.sku] = {
+          sku: v.sku,
+          inventoryItem: { id: `gid://shopify/InventoryItem/${v.inventory_item_id}` },
+          inventoryQuantity: v.inventory_quantity
+        };
+      }
+      const next = link?.match(/<([^>]+)>; rel="next"/);
+      url = next ? next[1].replace(`https://${SHOPIFY_STORE}/admin/api/2024-01`, '') : null;
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
   return bysku;
 }
 
