@@ -15,9 +15,10 @@ if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
 // ── 1. Charger tous les SKUs Shopify JH*/BF* ──────────────────
 async function fetchShopifySkus() {
-  const skus = new Set();
+  // Étape 1 : récupérer tous les IDs produit via GraphQL
+  const productIds = [];
   let cursor = null;
-  process.stdout.write('Chargement SKUs Shopify...');
+  process.stdout.write('Chargement produits Shopify...');
   do {
     const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
       method: 'POST',
@@ -26,21 +27,36 @@ async function fetchShopifySkus() {
         query: `query($cursor: String) {
           products(first: 50, query: "sku:JH* OR sku:BF* OR sku:B640* OR sku:BG42* OR sku:BY102* OR sku:CGTU03T* OR sku:CGTW02T* OR sku:B15*", after: $cursor) {
             pageInfo { hasNextPage endCursor }
-            edges { node { variants(first: 250) { edges { node { sku } } } } }
+            edges { node { id } }
           }
         }`,
         variables: { cursor }
       })
     }).then(r => r.json());
-    for (const { node: p } of res.data?.products?.edges || []) {
-      for (const { node: v } of p.variants.edges) {
-        if (v.sku) skus.add(v.sku);
-      }
-    }
+    for (const { node: p } of res.data?.products?.edges || []) productIds.push(p.id);
     cursor = res.data?.products?.pageInfo?.hasNextPage
       ? res.data?.products?.pageInfo?.endCursor : null;
   } while (cursor);
-  console.log(` ${skus.size} SKUs trouvés`);
+  process.stdout.write(` ${productIds.length} produits`);
+
+  // Étape 2 : pour chaque produit, récupérer TOUS les variants via REST (paginé)
+  const skus = new Set();
+  for (const gid of productIds) {
+    const numericId = gid.split('/').pop();
+    let url = `/products/${numericId}/variants.json?limit=250&fields=sku`;
+    while (url) {
+      const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${url}`, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
+      });
+      const link = res.headers.get('link');
+      const data = await res.json();
+      for (const v of data.variants || []) { if (v.sku) skus.add(v.sku); }
+      const next = link?.match(/<([^>]+)>; rel="next"/);
+      url = next ? next[1].replace(`https://${SHOPIFY_STORE}/admin/api/2024-01`, '') : null;
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
+  console.log(` → ${skus.size} SKUs trouvés`);
   return skus;
 }
 
@@ -74,6 +90,7 @@ function colorCandidates(colorName) {
     'PEPPERMINT':             ['PEPPER-MINT', 'PEPPERMINT'],
     'ORANGE CRUSH':           ['ORANGE-CRUSH', 'ORANGE+CRUSH'],
     'CHOCOLATE FUDGE BROWNIE':['CHOCOLATE+FUDGE+BROWN', 'CHOCOLATE-FUDGE-BROWNIE', 'CHOCOLATE+FUDGE+BROWNIE'],
+    'JET BLACK':              ['DEEP+BLACK', 'DEEP-BLACK'],
     'OXFORD NAVY/HEATHER GREY':['OXFORD-NAVY-HEATHER', 'OXFORD+NAVY+HEATHER+GREY', 'OXFORD-NAVY-HEATHER-GREY'],
     'GRAPHITE HEATHER':       ['GRAPHITE+HEATHER', 'GRAPHITE-HEATHER'],
     'CARAMEL LATTE':          ['CARAMEL+LATTE', 'CARAMEL-LATTE'],

@@ -48,32 +48,49 @@ async function gql(query, variables = {}) {
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ── Récupérer tous les variants d'un produit via REST (paginé) ──
+async function fetchAllVariantsRest(productGid) {
+  const numericId = productGid.split('/').pop();
+  let variants = [];
+  let url = `/products/${numericId}/variants.json?limit=250`;
+  while (url) {
+    const res = await fetch(`https://${STORE}/admin/api/2024-01${url}`, {
+      headers: { 'X-Shopify-Access-Token': TOKEN }
+    });
+    const link = res.headers.get('link');
+    const data = await res.json();
+    // Convertir format REST → format compatible avec le reste du script
+    for (const v of data.variants || []) {
+      variants.push({
+        id: `gid://shopify/ProductVariant/${v.id}`,
+        sku: v.sku || '',
+        inventoryQuantity: v.inventory_quantity,
+        selectedOptions: [
+          { name: 'Couleur', value: v.option1 || '' },
+          { name: 'Taille',  value: v.option2 || '' },
+        ]
+      });
+    }
+    const next = link?.match(/<([^>]+)>; rel="next"/);
+    url = next ? next[1].replace(`https://${STORE}/admin/api/2024-01`, '') : null;
+  }
+  return variants;
+}
+
 // ── Récupérer tous les produits JH001 ──────────────────────────
 async function fetchJH001Products() {
-  const products = [];
+  const productStubs = [];
   let cursor = null;
   do {
     const res = await gql(`
       query($cursor: String) {
         products(first: 5, query: "sku:JH001*", after: $cursor) {
           pageInfo { hasNextPage endCursor }
-          edges {
-            node {
-              id title
-              variants(first: 250) {
-                edges {
-                  node {
-                    id sku inventoryQuantity
-                    selectedOptions { name value }
-                  }
-                }
-              }
-            }
-          }
+          edges { node { id title } }
         }
       }
     `, { cursor });
-    for (const { node } of res.data?.products?.edges || []) products.push(node);
+    for (const { node } of res.data?.products?.edges || []) productStubs.push(node);
     cursor = res.data?.products?.pageInfo?.hasNextPage
       ? res.data.products.pageInfo.endCursor : null;
     await sleep(600);
@@ -82,11 +99,19 @@ async function fetchJH001Products() {
   // Aussi chercher par titre pour attraper les produits sans aucun SKU JH001* encore
   const res2 = await gql(`{
     products(first: 10, query: "title:*JH001* OR title:*Fruit*Loom*") {
-      edges { node { id title variants(first: 250) { edges { node { id sku inventoryQuantity selectedOptions { name value } } } } } }
+      edges { node { id title } }
     }
   }`);
   for (const { node } of res2.data?.products?.edges || []) {
-    if (!products.find(p => p.id === node.id)) products.push(node);
+    if (!productStubs.find(p => p.id === node.id)) productStubs.push(node);
+  }
+
+  // Charger les variants complets via REST (paginé — évite la limite de 250 du GraphQL)
+  const products = [];
+  for (const stub of productStubs) {
+    const variants = await fetchAllVariantsRest(stub.id);
+    products.push({ ...stub, variants: { edges: variants.map(v => ({ node: v })) } });
+    await sleep(300);
   }
 
   return products;
