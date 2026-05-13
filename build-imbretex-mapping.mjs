@@ -88,6 +88,9 @@ function sizeCandidates(sizeCode) {
   if (childMap[s]) childMap[s].forEach(x => candidates.add(x));
   // Normaliser les slashes
   candidates.add(s.replace(/\//g, '-'));
+  // XXL = 2XL selon le produit (JH043 utilise 2XL dans Shopify)
+  if (s === 'XXL') candidates.add('2XL');
+  if (s === '2XL') candidates.add('XXL');
   return [...candidates];
 }
 

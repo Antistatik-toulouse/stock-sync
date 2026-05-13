@@ -4,102 +4,88 @@
  * Format correct: {REF}-{COLOR}-{SIZE}
  * Usage: SHOPIFY_TOKEN=xxx node fix-zakeke-skus.mjs [--dry-run]
  */
+import { getAllProductIds, getAllVariants } from './shopify-utils.mjs';
 
 const TOKEN = process.env.SHOPIFY_TOKEN;
 const STORE = process.env.SHOPIFY_STORE || 'antistatiksamedi.myshopify.com';
 const DRY_RUN = process.argv.includes('--dry-run');
 if (!TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
+// Produits avec des variants Zakeke à corriger
 const PRODUCT_IDS = [
   'gid://shopify/Product/10195584713051', // T-shirt sport manches courtes Homme
   'gid://shopify/Product/10156372033883', // T-shirt Homme classique
   'gid://shopify/Product/10142295097691', // T-shirt Homme classique EXPRESS 24H
   'gid://shopify/Product/10106801488219', // T-shirt sport Enfant
   'gid://shopify/Product/10106786021723', // Body bébé
-  'gid://shopify/Product/10027863245147', // Polo Femme
-  'gid://shopify/Product/10027819991387', // T-shirt écoresponsable
-  'gid://shopify/Product/10025289875803', // T-shirt Femme classique
+  'gid://shopify/Product/10027863245147', // Polo Femme K255
+  'gid://shopify/Product/10027819991387', // T-shirt écoresponsable NS305
+  'gid://shopify/Product/10025289875803', // T-shirt Femme classique CGTW02T
 ];
-
-async function gql(query, variables = {}) {
-  const r = await fetch(`https://${STORE}/admin/api/2024-01/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-  return r.json();
-}
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function sizeToSlug(sizeValue) {
   return sizeValue.trim().toUpperCase()
-    .replace(/\//g, '-')      // "6/8 ANS" → "6-8 ANS"
-    .replace(/ ANS/g, 'ANS')  // "6-8 ANS" → "6-8ANS"
-    .replace(/\s+/g, '-');    // "3 MOIS" → "3-MOIS"
+    .replace(/\//g, '-')
+    .replace(/ ANS/g, 'ANS')
+    .replace(/\s+/g, '-');
 }
 
 function colorToSlug(colorValue) {
   return colorValue.trim().toUpperCase().replace(/\s+/g, '-');
 }
 
+function isZakeke(sku) {
+  if (!sku) return false;
+  const lower = sku.toLowerCase();
+  return lower.includes('zakeke') || (sku.includes(',') && sku.includes('-'));
+}
+
 function buildCorrectSku(currentSku, colorValue, sizeValue) {
-  // Extraire la ref avant la virgule
   const ref = currentSku.split(',')[0].trim();
-  const color = colorToSlug(colorValue);
-  const size = sizeToSlug(sizeValue);
-  return `${ref}-${color}-${size}`;
+  return `${ref}-${colorToSlug(colorValue)}-${sizeToSlug(sizeValue)}`;
 }
 
 console.log(`\n🔧 Fix SKUs Zakeke → Toptex${DRY_RUN ? ' (DRY RUN)' : ''}\n`);
 
 let totalFixed = 0, totalErrors = 0, totalSkipped = 0;
 
-for (const pid of PRODUCT_IDS) {
-  const res = await gql(`
-    query($id: ID!) {
-      product(id: $id) {
-        title
-        variants(first: 250) {
-          edges {
-            node {
-              id sku
-              selectedOptions { name value }
-            }
-          }
-        }
-      }
-    }
-  `, { id: pid });
+for (const gid of PRODUCT_IDS) {
+  const numericId = gid.split('/').pop();
 
-  const product = res.data?.product;
-  if (!product) { console.log(`⚠️  Produit ${pid} introuvable`); continue; }
+  // Titre via GraphQL
+  const titleRes = await fetch(`https://${STORE}/admin/api/2024-01/products/${numericId}.json?fields=id,title`, {
+    headers: { 'X-Shopify-Access-Token': TOKEN }
+  }).then(r => r.json());
+  const title = titleRes.product?.title || gid;
 
-  const variants = product.variants.edges.map(e => e.node);
-  const zakeke = variants.filter(v => v.sku?.includes('ZAKEKE') || v.sku?.includes(',-'));
+  // Variantes via REST pagination (illimité)
+  const variants = await getAllVariants(STORE, TOKEN, numericId);
+
+  const zakeke = variants.filter(v => isZakeke(v.sku));
 
   if (zakeke.length === 0) {
-    console.log(`✅ ${product.title}: aucun Zakeke`);
+    console.log(`✅ ${title}: aucun Zakeke (${variants.length} variants)`);
     continue;
   }
 
-  console.log(`\n📦 ${product.title}: ${zakeke.length} à corriger`);
+  console.log(`\n📦 ${title}: ${zakeke.length} Zakeke sur ${variants.length} variants`);
 
   let fixed = 0, errors = 0;
 
   for (const v of zakeke) {
-    const colorOpt = v.selectedOptions?.find(o => /colou?r|couleur|teinte/i.test(o.name))
-                  || v.selectedOptions?.[0];
-    const sizeOpt  = v.selectedOptions?.find(o => /size|taille|pointure/i.test(o.name))
-                  || v.selectedOptions?.[1];
+    // Les options REST sont dans option1, option2, option3
+    const colorValue = v.option1 || '';
+    const sizeValue  = v.option2 || '';
 
-    if (!colorOpt || !sizeOpt) {
-      console.log(`  ⚠️  Options manquantes pour ${v.id}: ${v.selectedOptions?.map(o=>o.name+'='+o.value).join(', ')}`);
+    if (!colorValue || !sizeValue) {
+      console.log(`  ⚠️  Options manquantes pour variant ${v.id}: opt1=${v.option1} opt2=${v.option2}`);
       totalSkipped++;
       continue;
     }
 
-    const newSku = buildCorrectSku(v.sku, colorOpt.value, sizeOpt.value);
+    const newSku = buildCorrectSku(v.sku, colorValue, sizeValue);
 
     if (DRY_RUN) {
       if (fixed < 5) console.log(`  ${v.sku} → ${newSku}`);
@@ -107,18 +93,17 @@ for (const pid of PRODUCT_IDS) {
       continue;
     }
 
-    const numericId = v.id.split('/').pop();
-    const r = await fetch(`https://${STORE}/admin/api/2024-01/variants/${numericId}.json`, {
+    const r = await fetch(`https://${STORE}/admin/api/2024-01/variants/${v.id}.json`, {
       method: 'PUT',
       headers: { 'X-Shopify-Access-Token': TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ variant: { id: numericId, sku: newSku } })
+      body: JSON.stringify({ variant: { id: v.id, sku: newSku } })
     });
     const json = await r.json();
 
     if (r.status !== 200 || json.errors) {
       errors++;
       totalErrors++;
-      console.error(`  ❌ ${v.sku} → ${newSku}: ${JSON.stringify(json.errors || r.status)}`);
+      console.error(`  ❌ ${newSku}: ${JSON.stringify(json.errors || r.status)}`);
     } else {
       fixed++;
       totalFixed++;
@@ -127,7 +112,8 @@ for (const pid of PRODUCT_IDS) {
     await sleep(550);
   }
 
-  console.log(`\n  ✅ ${fixed} corrigés, ${errors} erreurs`);
+  if (!DRY_RUN) console.log(`\n  ✅ ${fixed} corrigés, ${errors} erreurs`);
+  else console.log(`\n  (dry-run) ${fixed} à corriger`);
 }
 
 console.log(`\n══════════════════════════════`);
