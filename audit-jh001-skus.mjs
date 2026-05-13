@@ -13,54 +13,65 @@ const TOKEN = process.env.SHOPIFY_TOKEN;
 const STORE = process.env.SHOPIFY_STORE || 'antistatiksamedi.myshopify.com';
 if (!TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
-async function gql(query, variables = {}) {
-  const r = await fetch(`https://${STORE}/admin/api/2024-01/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-  const text = await r.text();
-  try { return JSON.parse(text); } catch { throw new Error('Non-JSON: ' + text.slice(0, 200)); }
+const API = `https://${STORE}/admin/api/2024-01`;
+
+async function restGet(path) {
+  const r = await fetch(`${API}${path}`, { headers: { 'X-Shopify-Access-Token': TOKEN } });
+  if (r.status === 429) {
+    await new Promise(res => setTimeout(res, parseInt(r.headers.get('Retry-After') || '2') * 1000));
+    return restGet(path);
+  }
+  const data = await r.json();
+  return { data, link: r.headers.get('link') };
 }
-async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function getAllPages(firstPath) {
+  const items = [];
+  let path = firstPath;
+  while (path) {
+    const { data, link } = await restGet(path);
+    const arr = Object.values(data)[0];
+    items.push(...arr);
+    const next = link?.match(/<https?:\/\/[^/]+\/admin\/api\/[^>]+>; rel="next"/);
+    if (next) {
+      const fullUrl = next[0].match(/<([^>]+)>/)[1];
+      path = fullUrl.replace(`${API}`, '');
+    } else {
+      path = null;
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return items;
+}
+
+async function getAllVariantsForProduct(productId) {
+  return getAllPages(`/products/${productId}/variants.json?limit=250`);
+}
 
 // ── 1. SKUs Shopify JH001 ─────────────────────────────────────
 console.log('1. Chargement variants JH001 depuis Shopify...');
-const shopifyVariants = []; // { sku, color, size, qty, id }
-let cursor = null;
-do {
-  const res = await gql(`
-    query($c: String) {
-      products(first: 10, query: "sku:JH001*", after: $c) {
-        pageInfo { hasNextPage endCursor }
-        edges {
-          node {
-            id title
-            variants(first: 250) {
-              edges {
-                node {
-                  id sku inventoryQuantity
-                  selectedOptions { name value }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  `, { c: cursor });
-  for (const { node: p } of res.data?.products?.edges || []) {
-    for (const { node: v } of p.variants.edges) {
-      const color = v.selectedOptions?.find(o => /colou?r|couleur|teinte/i.test(o.name))?.value
-                 || v.selectedOptions?.[0]?.value || '';
-      const size  = v.selectedOptions?.find(o => /size|taille/i.test(o.name))?.value
-                 || v.selectedOptions?.[1]?.value || '';
-      shopifyVariants.push({ id: v.id, sku: v.sku || '', color, size, qty: v.inventoryQuantity });
-    }
+
+// Récupérer tous les produits, puis filtrer par SKU JH001
+const allProducts = await getAllPages('/products.json?limit=250&fields=id,title,options');
+const jh001Products = [];
+for (const p of allProducts) {
+  // On charge les variants REST paginés pour chaque produit
+  const variants = await getAllVariantsForProduct(p.id);
+  const jh001Variants = variants.filter(v => v.sku && v.sku.startsWith('JH001'));
+  if (jh001Variants.length > 0) {
+    jh001Products.push({ ...p, variants });
   }
-  cursor = res.data?.products?.pageInfo?.hasNextPage ? res.data.products.pageInfo.endCursor : null;
-  await sleep(600);
-} while (cursor);
+}
+
+const shopifyVariants = [];
+for (const p of jh001Products) {
+  for (const v of p.variants.filter(v => v.sku?.startsWith('JH001'))) {
+    const opts = v.option1 ? [v.option1, v.option2, v.option3].filter(Boolean) : [];
+    const color = opts[0] || '';
+    const size  = opts[1] || '';
+    shopifyVariants.push({ id: v.id, sku: v.sku || '', color, size, qty: v.inventory_quantity });
+  }
+}
 
 console.log(`   ${shopifyVariants.length} variants trouvés`);
 
