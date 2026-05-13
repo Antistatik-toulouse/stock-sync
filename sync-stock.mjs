@@ -1,7 +1,7 @@
 import { CognitoUserPool, CognitoUser, AuthenticationDetails } from 'amazon-cognito-identity-js';
 
 const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
-const SHOPIFY_STORE = 'antistatikstore.myshopify.com';
+const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'antistatiksamedi.myshopify.com';
 const TOPTEX_USERNAME = 'tofr_antistatik';
 const TOPTEX_PASSWORD = process.env.TOPTEX_PASSWORD;
 const TOPTEX_API_KEY = process.env.TOPTEX_API_KEY;
