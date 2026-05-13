@@ -40,6 +40,19 @@ function buildAlt(title, productType, color, imgIndexInColor, totalForColor) {
   return `${fr} | ${en}`.slice(0, 512);
 }
 
+import { getAllVariants } from './shopify-utils.mjs';
+
+const API = `https://${SHOPIFY_STORE}/admin/api/2024-01`;
+
+async function restGet(path) {
+  const r = await fetch(`${API}${path}`, { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } });
+  if (r.status === 429) {
+    await new Promise(res => setTimeout(res, parseInt(r.headers.get('Retry-After') || '2') * 1000));
+    return restGet(path);
+  }
+  return { data: await r.json(), link: r.headers.get('link') };
+}
+
 async function gql(query, variables = {}) {
   const r = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
     method: 'POST',
@@ -50,52 +63,48 @@ async function gql(query, variables = {}) {
 }
 
 async function main() {
-  console.log(`\n🖼  Alt texts SEO Shopify${DRY_RUN ? ' (DRY RUN)' : ''}`);
+  console.log(`\nAlt texts SEO Shopify${DRY_RUN ? ' (DRY RUN)' : ''}`);
   console.log(`   ${new Date().toLocaleString('fr-FR')}\n`);
 
-  // 1. Charger tous les produits avec images + variants
+  // 1. Charger tous les produits avec images via REST paginé
   console.log('1. Chargement des produits...');
   const products = [];
-  let cursor = null;
-  do {
-    const res = await gql(`query($cursor: String) {
-      products(first: 50, after: $cursor) {
-        pageInfo { hasNextPage endCursor }
-        edges { node {
-          id title productType
-          images(first: 100) { edges { node { id altText } } }
-          variants(first: 250) { edges { node {
-            selectedOptions { name value }
-            image { id }
-          } } }
-        } }
-      }
-    }`, { cursor });
-    for (const { node: p } of res.data?.products?.edges || []) products.push(p);
-    cursor = res.data?.products?.pageInfo?.hasNextPage ? res.data?.products?.pageInfo?.endCursor : null;
-  } while (cursor);
-  console.log(`   ✅ ${products.length} produits\n`);
+  let path = '/products.json?limit=250&fields=id,title,product_type,images';
+  while (path) {
+    const { data, link } = await restGet(path);
+    products.push(...data.products);
+    const next = link?.match(/<([^>]+)>; rel="next"/);
+    path = next ? next[1].replace(API, '') : null;
+  }
+  console.log(`   ${products.length} produits\n`);
 
   // 2. Générer les alt texts
   console.log('2. Génération des alt texts...');
   const updates = []; // { productId, imageId, alt }
 
   for (const p of products) {
-    const images = p.images.edges.map(e => e.node);
+    // Charger TOUS les variants via REST paginé (pas de limite)
+    const variants = await getAllVariants(SHOPIFY_STORE, SHOPIFY_TOKEN, p.id);
 
-    // Map imageId → liste de couleurs (via variants)
+    const images = p.images;
+
+    // Map imageId → liste de couleurs (via variants.image_id)
     const imageColorMap = {};
-    for (const { node: v } of p.variants.edges) {
-      const imgId = v.image?.id;
-      if (!imgId) continue;
-      const color = v.selectedOptions.find(o => o.name === 'Couleur')?.value || '';
-      if (!imageColorMap[imgId]) imageColorMap[imgId] = new Set();
-      imageColorMap[imgId].add(color);
+    for (const v of variants) {
+      const imgId = v.image_id ? `gid://shopify/MediaImage/${v.image_id}` : null;
+      // REST image_id est numérique, on mappe sur l'id REST de l'image
+      const restImgId = v.image_id;
+      if (!restImgId) continue;
+      const color = v.option1 || '';
+      if (!imageColorMap[restImgId]) imageColorMap[restImgId] = new Set();
+      imageColorMap[restImgId].add(color);
     }
 
     // Grouper les images par couleur dominante
     const colorToImages = {}; // color → [imageId, ...]
     const processedImages = new Set();
+
+    const productGid = `gid://shopify/Product/${p.id}`;
 
     // D'abord les images liées à UNE seule couleur
     for (const img of images) {
@@ -111,18 +120,20 @@ async function main() {
     // Assigner alt text par groupe couleur
     for (const [color, imgs] of Object.entries(colorToImages)) {
       imgs.forEach((img, idx) => {
-        if (img.altText) return; // déjà défini
-        const alt = buildAlt(p.title, p.productType, color, idx, imgs.length);
-        updates.push({ productId: p.id, imageId: img.id, alt });
+        if (img.alt) return; // déjà défini
+        const alt = buildAlt(p.title, p.product_type, color, idx, imgs.length);
+        const imageGid = `gid://shopify/MediaImage/${img.admin_graphql_api_id?.split('/').pop() || img.id}`;
+        updates.push({ productId: productGid, imageId: imageGid, alt });
       });
     }
 
     // Images restantes (pas liées à une couleur spécifique ou partagées)
-    images.filter(img => !processedImages.has(img.id) && !img.altText).forEach((img, idx) => {
+    images.filter(img => !processedImages.has(img.id) && !img.alt).forEach((img, idx) => {
       const colors = imageColorMap[img.id] ? [...imageColorMap[img.id]] : [];
       const color = colors.length > 0 ? colors[0] : '';
-      const alt = buildAlt(p.title, p.productType, color, idx, 1);
-      updates.push({ productId: p.id, imageId: img.id, alt });
+      const alt = buildAlt(p.title, p.product_type, color, idx, 1);
+      const imageGid = `gid://shopify/MediaImage/${img.admin_graphql_api_id?.split('/').pop() || img.id}`;
+      updates.push({ productId: productGid, imageId: imageGid, alt });
     });
   }
 

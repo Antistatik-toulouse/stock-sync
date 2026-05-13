@@ -8,49 +8,54 @@ const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'antistatiksamedi.myshopify.com';
 if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
-async function gql(query, variables = {}) {
-  const r = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-  return r.json();
+import { getAllVariants } from './shopify-utils.mjs';
+
+const API = `https://${SHOPIFY_STORE}/admin/api/2024-01`;
+
+async function restGet(path) {
+  const r = await fetch(`${API}${path}`, { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } });
+  if (r.status === 429) {
+    await new Promise(res => setTimeout(res, parseInt(r.headers.get('Retry-After') || '2') * 1000));
+    return restGet(path);
+  }
+  return { data: await r.json(), link: r.headers.get('link') };
+}
+
+async function getAllProducts() {
+  const products = [];
+  let path = '/products.json?limit=250&fields=id,title,options';
+  while (path) {
+    const { data, link } = await restGet(path);
+    products.push(...data.products);
+    const next = link?.match(/<([^>]+)>; rel="next"/);
+    path = next ? next[1].replace(`${API}`, '') : null;
+  }
+  return products;
 }
 
 async function main() {
   console.log('\nAudit coloris entièrement à 0 (JH*/BF*)\n');
 
+  const allProducts = await getAllProducts();
+
+  // Charger tous les variants via REST paginé, filtrer JH*/BF*
   const products = [];
-  let cursor = null;
-  do {
-    const res = await gql(`query($cursor: String) {
-      products(first: 50, query: "sku:JH* OR sku:BF*", after: $cursor) {
-        pageInfo { hasNextPage endCursor }
-        edges { node {
-          title
-          variants(first: 250) { edges { node {
-            sku inventoryQuantity
-            selectedOptions { name value }
-          }}}
-        }}
-      }
-    }`, { cursor });
-    for (const { node: p } of res.data?.products?.edges || []) products.push(p);
-    cursor = res.data?.products?.pageInfo?.hasNextPage
-      ? res.data?.products?.pageInfo?.endCursor : null;
-  } while (cursor);
+  for (const p of allProducts) {
+    const variants = await getAllVariants(SHOPIFY_STORE, SHOPIFY_TOKEN, p.id);
+    const relevant = variants.filter(v => v.sku && /^(JH|BF)/.test(v.sku));
+    if (relevant.length > 0) products.push({ title: p.title, variants: relevant });
+  }
 
   console.log(`${products.length} produits chargés\n`);
 
   const zeroColors = [];
 
   for (const p of products) {
-    // Grouper par couleur
     const byColor = {};
-    for (const { node: v } of p.variants.edges) {
-      const color = v.selectedOptions.find(o => o.name === 'Couleur')?.value || 'Sans couleur';
+    for (const v of p.variants) {
+      const color = v.option1 || 'Sans couleur';
       if (!byColor[color]) byColor[color] = [];
-      byColor[color].push({ sku: v.sku, stock: v.inventoryQuantity });
+      byColor[color].push({ sku: v.sku, stock: v.inventory_quantity });
     }
 
     for (const [color, variants] of Object.entries(byColor)) {
