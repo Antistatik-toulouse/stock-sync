@@ -9,35 +9,17 @@ const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'antistatiksamedi.myshopify.com';
 if (!SHOPIFY_TOKEN) throw new Error('SHOPIFY_TOKEN manquant');
 
-// Traductions productType FR → EN
-const TYPE_EN = {
-  'T-shirt':           'customizable T-shirt',
-  'T-shirt oversize':  'customizable oversized T-shirt',
-  'Sweat à capuche':   'customizable hooded sweatshirt',
-  'Sweat à col rond':  'customizable crewneck sweatshirt',
-  'Sweat zippé':       'customizable zip-up hoodie',
-  'Polo':              'customizable polo shirt',
-  'Tote bag':          'customizable tote bag',
-  'Casquette':         'customizable cap',
-  'Mug':               'customizable ceramic mug',
-  '':                  'customizable product',
-};
+function cleanTitle(title) {
+  return title.replace(/\s+personnalisables?\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+}
 
-function buildAlt(title, productType, color, imgIndexInColor, totalForColor) {
-  const typeEN = TYPE_EN[productType] || 'customizable product';
-  const colorPart = color ? ` ${color}` : '';
-
-  // Vue selon la position dans le groupe couleur
-  let viewFR = '', viewEN = '';
-  if (totalForColor >= 2) {
-    if (imgIndexInColor === 0)      { viewFR = ' - vue de face';   viewEN = ' - front view'; }
-    else if (imgIndexInColor === 1) { viewFR = ' - vue de dos';    viewEN = ' - back view'; }
-    else                            { viewFR = ' - vue détail';    viewEN = ' - detail'; }
+function buildAlt(title, color) {
+  const base = cleanTitle(title);
+  if (color) {
+    const colorCap = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
+    return `${base} ${colorCap} personnalisable | Antistatik`;
   }
-
-  const fr = `${title}${colorPart}${viewFR}`;
-  const en = `${typeEN}${colorPart} - Antistatik${viewEN}`;
-  return `${fr} | ${en}`.slice(0, 512);
+  return `${base} personnalisable | Antistatik Toulouse`;
 }
 
 import { getAllVariants } from './shopify-utils.mjs';
@@ -121,7 +103,7 @@ async function main() {
     for (const [color, imgs] of Object.entries(colorToImages)) {
       imgs.forEach((img, idx) => {
         if (img.alt) return; // déjà défini
-        const alt = buildAlt(p.title, p.product_type, color, idx, imgs.length);
+        const alt = buildAlt(p.title, color);
         const imageGid = `gid://shopify/MediaImage/${img.admin_graphql_api_id?.split('/').pop() || img.id}`;
         updates.push({ productId: productGid, imageId: imageGid, alt });
       });
@@ -131,7 +113,7 @@ async function main() {
     images.filter(img => !processedImages.has(img.id) && !img.alt).forEach((img, idx) => {
       const colors = imageColorMap[img.id] ? [...imageColorMap[img.id]] : [];
       const color = colors.length > 0 ? colors[0] : '';
-      const alt = buildAlt(p.title, p.product_type, color, idx, 1);
+      const alt = buildAlt(p.title, color);
       const imageGid = `gid://shopify/MediaImage/${img.admin_graphql_api_id?.split('/').pop() || img.id}`;
       updates.push({ productId: productGid, imageId: imageGid, alt });
     });
