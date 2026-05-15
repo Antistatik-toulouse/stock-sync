@@ -40,7 +40,7 @@ async function toptex(path) {
   return res.json();
 }
 
-async function shopify(path, method = 'GET', body = null, retries = 5) {
+async function shopify(path, method = 'GET', body = null, retries = 8) {
   const opts = {
     method,
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' }
@@ -49,12 +49,15 @@ async function shopify(path, method = 'GET', body = null, retries = 5) {
   for (let attempt = 0; attempt < retries; attempt++) {
     const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01${path}`, opts);
     if (res.status === 429) {
-      const wait = parseInt(res.headers.get('Retry-After') || '10', 10) * 1000;
+      // Backoff exponentiel : 2s, 4s, 8s, 16s, 32s, 60s, 60s, 60s (cap)
+      const backoff = Math.min(2 ** (attempt + 1), 60);
+      const retryAfter = parseFloat(res.headers.get('Retry-After'));
+      const wait = (retryAfter && retryAfter > backoff ? retryAfter : backoff) * 1000;
       await sleep(wait);
       continue;
     }
     if (res.status >= 500) {
-      await sleep(2000 * (attempt + 1));
+      await sleep(Math.min(2 ** (attempt + 1), 60) * 1000);
       continue;
     }
     const text = await res.text();

@@ -38,13 +38,23 @@ async function getImbreToken() {
 const IMBRE_TO_SKU = await buildMapping();
 
 // ── Helpers ────────────────────────────────────────────────────
-async function shopifyGql(query, variables = {}) {
-  const r = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
-    method: 'POST',
-    headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-  return r.json();
+async function shopifyGql(query, variables = {}, retries = 8) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const r = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/graphql.json`, {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables })
+    });
+    if (r.status === 429 || r.status >= 500) {
+      const backoff = Math.min(2 ** (attempt + 1), 60);
+      const retryAfter = parseFloat(r.headers.get('Retry-After'));
+      const wait = (retryAfter && retryAfter > backoff ? retryAfter : backoff) * 1000;
+      await new Promise(res => setTimeout(res, wait));
+      continue;
+    }
+    return r.json();
+  }
+  throw new Error(`Shopify GraphQL échoué après ${retries} tentatives`);
 }
 
 async function fetchAllImbreStocks() {
